@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Verse Image Maker</title>
+
+<!-- Use local font.ttf (place font.ttf in same folder) -->
+<style>
+  @font-face{
+    font-family: 'CustomVerseFont';
+    src: url('font.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  body {
+    margin:0;
+    background: #0f1724;
+    color:#fff;
+    font-family: Inter, system-ui, sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+  }
+
+  .card {
+    width:100%;
+    max-width:420px;
+    background:#111827;
+    padding:16px;
+    border-radius:14px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.6);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  canvas {
+    width:100%;
+    max-width:100%;
+    height:auto;
+    background:#000;
+    border-radius:10px;
+    display:block;
+  }
+
+  .controls{
+    display:flex;
+    gap:8px;
+  }
+
+  .btn{
+    background:#2563eb;
+    border:none;
+    color:white;
+    padding:10px 12px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    flex:1;
+  }
+  .btn.secondary{
+    background:#374151;
+    color:#d1d5db;
+  }
+
+  .meta{
+    font-size:12px;
+    color:#9ca3af;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <canvas id="verseCanvas" width="500" height="500"></canvas>
+    <div class="controls">
+      <button id="newBtn" class="btn">New Verse</button>
+      <button id="shareBtn" class="btn secondary">Share / Download</button>
+    </div>
+    <div class="meta">
+      Image: <span id="imgName">—</span> · Verse source: <span id="verseSrc">—</span>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const verses = {
+    "Salvation & Faith.txt": [
+      "For by grace you have been saved through faith.",
+      "Trust in the Lord with all your heart."
+    ],
+    "Love.txt": [
+      "Love bears all things, believes all things.",
+      "Greater love has no one than this."
+    ],
+    "Strength & Encouragement.txt": [
+      "I can do all things through Christ.",
+      "Be strong and courageous; do not fear."
+    ],
+    "Wisdom & Guidance.txt": [
+      "If any of you lacks wisdom, ask God.",
+      "Your word is a lamp to my feet."
+    ],
+    "Forgiveness & Grace.txt": [
+      "Be kind and forgiving to one another.",
+      "His grace is sufficient for you."
+    ],
+    "Hope & Comfort.txt": [
+      "May the God of hope fill you with peace.",
+      "Blessed are those who mourn."
+    ],
+    "Prayer & Relationship with God.txt": [
+      "Pray without ceasing.",
+      "Draw near to God and He will draw near to you."
+    ],
+    "Obedience & Righteous Living.txt": [
+      "Walk in the way of love and live in righteousness.",
+      "Blessed are those who thirst for righteousness."
+    ],
+    "End Times & Eternal Life.txt": [
+      "To live is Christ and to die is gain.",
+      "Set your minds on things above."
+    ]
+  };
+
+  const imageFiles = Array.from({length:10}, (_,i) => (i+1) + '.jpg');
+
+  const canvas = document.getElementById('verseCanvas');
+  const ctx = canvas.getContext('2d');
+  const newBtn = document.getElementById('newBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const imgNameEl = document.getElementById('imgName');
+  const verseSrcEl = document.getElementById('verseSrc');
+
+  const CANVAS_W = 500, CANVAS_H = 500;
+  const FONT_FAMILY = 'CustomVerseFont, system-ui, Arial';
+
+  function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  const verseEntries = [];
+  for (const [file, lines] of Object.entries(verses)) {
+    for (const line of lines) verseEntries.push({source:file, text:line});
+  }
+
+  function wrapText(ctx, text, maxWidth, maxLines, baseSize) {
+    let fontSize = baseSize;
+    ctx.font = '700 ' + fontSize + 'px ' + FONT_FAMILY;
+
+    function split(fs){
+      ctx.font = '700 ' + fs + 'px ' + FONT_FAMILY;
+      const words = text.split(/\s+/);
+      const lines = [];
+      let cur = '';
+      for (let w of words){
+        let test = cur ? cur + ' ' + w : w;
+        if (ctx.measureText(test).width <= maxWidth){
+          cur = test;
+        } else {
+          lines.push(cur);
+          cur = w;
+        }
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    }
+
+    let lines = split(fontSize);
+    while(lines.length > maxLines && fontSize > 10){
+      fontSize -= 2;
+      lines = split(fontSize);
+    }
+    return {lines, fontSize};
+  }
+
+  function drawVerseImage(imagePath, verseEntry){
+    return new Promise((resolve) => {
+      ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+
+      const img = new Image();
+      img.onload = () => {
+        const aspect = img.width/img.height;
+        const canvasAspect = CANVAS_W/CANVAS_H;
+        let sx, sy, sw, sh;
+        if(aspect > canvasAspect){
+          sh = img.height;
+          sw = sh*canvasAspect;
+          sx=(img.width-sw)/2; sy=0;
+        } else {
+          sw=img.width;
+          sh=sw/canvasAspect;
+          sx=0; sy=(img.height-sh)/2;
+        }
+        ctx.drawImage(img,sx,sy,sw,sh,0,0,CANVAS_W,CANVAS_H);
+        ctx.fillStyle='rgba(0,0,0,0.35)';
+        ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+
+        const {lines, fontSize} = wrapText(ctx, verseEntry.text, 450, 12, 36);
+        const lineHeight = fontSize*1.1;
+        const totalHeight = lines.length*lineHeight;
+        let startY = (CANVAS_H-totalHeight)/2;
+
+        ctx.font='700 '+fontSize+'px '+FONT_FAMILY;
+        ctx.fillStyle='#fff';
+        ctx.strokeStyle='rgba(0,0,0,0.55)';
+        ctx.lineWidth=Math.max(2,Math.round(fontSize*0.08));
+
+        for(let i=0;i<lines.length;i++){
+          const y=startY+i*lineHeight+lineHeight/2;
+          ctx.strokeText(lines[i],CANVAS_W/2,y);
+          ctx.fillText(lines[i],CANVAS_W/2,y);
+        }
+
+        ctx.font='600 12px '+FONT_FAMILY;
+        ctx.fillStyle='rgba(255,255,255,0.75)';
+        ctx.fillText(verseEntry.source,CANVAS_W/2,CANVAS_H-12);
+
+        resolve();
+      };
+      img.onerror = () => {
+        ctx.fillStyle='#1f2937'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+        ctx.fillStyle='#fff'; ctx.font='16px '+FONT_FAMILY;
+        ctx.fillText("Image not found",CANVAS_W/2,CANVAS_H/2);
+        resolve();
+      };
+      img.src=imagePath;
+    });
+  }
+
+  async function generate(){
+    const verse=pickRandom(verseEntries);
+    const img=pickRandom(imageFiles);
+    imgNameEl.textContent=img;
+    verseSrcEl.textContent=verse.source;
+    await drawVerseImage(img,verse);
+  }
+
+  newBtn.onclick=()=>generate();
+  shareBtn.onclick=()=>{
+    canvas.toBlob(blob=>{
+      if(!blob) return;
+      const file=new File([blob],'verse.png',{type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file],title:'Verse Image'}).catch(()=>{});
+      } else {
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='verse.png';
+        a.click();
+      }
+    });
+  };
+
+  window.onload=()=>generate();
+})();
+</script>
+</body>
+</html>
